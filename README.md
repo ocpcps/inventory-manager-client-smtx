@@ -1,0 +1,1 @@
+# inventory-manager-client-smtx
