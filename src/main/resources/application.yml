@@ -1,0 +1,28 @@
+## YAML Template.
+# com.osstelecom.db.inventory.manager
+---
+logging:
+    group:
+        system: com.osstelecom.db.inventory.manager.client.smtx
+        client: com.osstelecom.db.inventory.manager.http
+    level:
+        system: TRACE
+        client: TRACE
+    
+spring:
+  datasource:
+#    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    url: jdbc:sqlserver://10.126.111.184;databaseName=MeiosTX_Web_BN;schema=dbo;encrypt=true;trustServerCertificate=true
+    username: invmashup
+    password: '&NQFLlSiEaF8'
+          
+  quartz:
+    job-store-type: memory
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: smtx-importer-job
+            instanceId: ${JOB_INSTANCE:DEV_INSTANCE}
+          threadPool:
+            threadCount: 10

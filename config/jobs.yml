@@ -1,0 +1,983 @@
+- name: smtxRadioImport
+  group: smtx
+  className: com.osstelecom.db.inventory.manager.client.smtx.jobs.SMTXRadioJob
+  cron: "*/10 * * * * ?"
+  enabled: false
+  queries:
+      #
+      # Query que busca os rádios
+      #
+      getRadios: SELECT 
+            eq1.SiglaET HOSTNAME,
+            radios.Status STATUS,
+            radios.SiglaPlataforma HOSTNAME_PLATAFORMA,
+            sit.SiglaSite SIGLA_SITE,
+            fabEq.Descricao FABRICANTE,
+            radios.Tecnologia TECNOLOGIA,
+            modEq.Descricao  MODELO,    
+            radios.EnderecoIP IP_GERENCIA,
+            radios.Subrede MASC_GERENCIA,
+            sit.UFDoSite REGIONAL,
+            radios.Configuracao CONFIGURACAO,
+            radios.RadioGerenciado GERENCIADO,
+            ant.SiglaAntena SIGLA_ANTENA
+        FROM
+            MeiosTX_Web_MG.dbo.tabRadios radios
+        JOIN MeiosTX_Web_MG.dbo.tabEquipamentosTransmissao eq1 on
+            eq1.idEquipTrans = radios.idEquipTrans
+        LEFT JOIN MeiosTX_Web_MG.dbo.tabAntenas ant on
+            ant.idAntena = radios.idAntena
+        JOIN MeiosTX_Web_MG.dbo.tabSites sit on
+            sit.idSite = ant.idSite
+        JOIN MeiosTX_Web_MG.dbo.tabAntenaModelos antMod on
+            antMod.codAntena = ant.codAntena
+        JOIN MeiosTX_Web_MG.dbo.tabAntenaFabricantes antFab on
+            antFab.codFabricanteAntena  = antMod.codFabricanteAntena 
+        JOIN MeiosTX_Web_MG.dbo.tabFabricantesEquipTransmissao fabEq 
+           on fabEq.codFabricante = radios.codFabricante
+        JOIN  MeiosTX_Web_MG.dbo.tabModelosEquipTransmissao modEq 
+           on modEq.codModeloEquip = radios.ModeloEquip
+        WHERE   
+            radios.Status != 'Desativado'
+        
+      #
+      # Query que busca as interfaces dos radios
+      #
+      getPortas:
+            SELECT
+                eq1.SiglaET HOSTNAME,
+                trpf.Porta PORTA,
+                trpf.VelocidadePorta VELOCIDADE_PORTA,
+                trpf.idDID ID_DID,
+                tfe.idFast ID_FAST
+            FROM
+                MeiosTX_Web_MG.dbo.tabRadios radios
+            JOIN MeiosTX_Web_MG.dbo.tabEquipamentosTransmissao eq1 ON
+                eq1.idEquipTrans = radios.idEquipTrans
+            JOIN MeiosTX_Web_MG.dbo.tabRadioPortasFast trpf ON
+                trpf.idEquipTrans = radios.idEquipTrans
+            LEFT JOIN MeiosTX_Web_MG.dbo.tabFastEthernet tfe ON
+                tfe.idEquipTransB = trpf.idEquipTrans
+                and tfe.PortaB = trpf.Porta
+            where
+                trpf.VelocidadePorta is not null
+            order by
+                radios.idEquipTrans,
+                trpf.Porta
+            
+      #
+      # Coleta as Antenas
+      #
+      getAntenas:
+          SELECT
+                eq1.idEquipTrans ,
+                eq1.SiglaET HOSTNAME,
+                radios.SiglaPlataforma HOSTNAME_PLATAFORMA,
+                ant.SiglaAntena SIGLA_ANTENA,
+                ant.Altura ALTURA_ANTENA,
+                antMod.Diametro DIAMETRO_ANTENA,
+                radios.Azimute AZIMUTE,
+                antFab.FabricanteAntena VENDOR_ANTENA,
+                antMod.SiglaAntena MODELO_ANTENA,
+                radios.AnguloElevacao ANGULO_ELEVACAO,
+                radios.Trecho TRECHO,
+                freq.Polarizacao POLARIZACAO ,
+                tfa.Baixa FREQ_TX,
+                tfa.Alta FREQ_RX,
+                radios.Modulacao MODULACAO,
+                radios.ModulacaoMax MODULACAO_MAX,
+                radios .ModulacaoAdaptativa MODULACAO_ADAPTATIVA,
+                trc.EspacamentoCanal ESPACAMENTO_CANAL,
+                trc.CapacidadeMb CAPACIDADE_MB,
+                radios.CapacidadeMbMax CAPACIDADE_MAX
+        FROM
+                MeiosTX_Web_MG.dbo.tabRadios radios
+        JOIN MeiosTX_Web_MG.dbo.tabEquipamentosTransmissao eq1 ON
+                eq1.idEquipTrans = radios.idEquipTrans
+        JOIN MeiosTX_Web_MG.dbo.tabRadioFrequencias freq ON
+                freq.idEquipTrans = eq1.idEquipTrans
+        JOIN MeiosTX_Web_MG.dbo.tabAntenas ant ON
+                ant.idAntena = radios.idAntena
+        JOIN MeiosTX_Web_MG.dbo.tabSites sit ON
+                sit.idSite = ant.idSite
+        JOIN MeiosTX_Web_MG.dbo.tabAntenaModelos antMod ON
+                antMod.codAntena = ant.codAntena
+        JOIN MeiosTX_Web_MG.dbo.tabAntenaFabricantes antFab ON
+                antFab.codFabricanteAntena = antMod.codFabricanteAntena
+        JOIN MeiosTX_Web_MG.dbo.tabFrequenciasAnatel tfa ON
+                tfa.idFrequenciaAnatel = freq.idFrequenciaAnatel
+        JOIN MeiosTX_Web_MG.dbo.tabFabricantesEquipTransmissao fabEq 
+           ON
+                fabEq.codFabricante = radios.codFabricante
+        JOIN MeiosTX_Web_MG.dbo.tabModelosEquipTransmissao modEq 
+           ON
+                modEq.codModeloEquip = radios.ModeloEquip
+        JOIN MeiosTX_Web_MG.dbo.tabRadioModeloCaracteristicas trc ON
+                trc.codModeloEquip = modEq.codModeloEquip
+                AND trc.FaixaFrequencia = tfa.FaixaFrequencia
+                AND trc.Modulacao = radios.Modulacao
+                AND trc.CapacidadeMb = radios.CapacidadeMb
+        WHERE
+                radios.Status != 'Desativado' 
+                ORDER BY eq1.SiglaET
+      
+      getFrequencias:
+          SELECT
+              radios.SiglaET ,
+                  freq.Polarizacao POLARIZACAO,
+                  round(tfa.Baixa,2) FREQ_TX,
+                  round(tfa.Alta,2) FREQ_RX,
+                  radios.Modulacao MODULACAO,
+                  radios.ModulacaoMax MODULACAO_MAX,
+                  radios .ModulacaoAdaptativa MODULACAO_ADAPTATIVA,
+                  trc.EspacamentoCanal ESPACAMENTO_CANAL,
+                  trc.CapacidadeMb CAPACIDADE_MB
+          FROM
+                  MeiosTX_Web_MG.dbo.tabRadios radios
+          JOIN MeiosTX_Web_MG.dbo.tabEquipamentosTransmissao eq1
+           ON eq1.idEquipTrans = radios.idEquipTrans
+          JOIN MeiosTX_Web_MG.dbo.tabRadioFrequencias freq
+           ON freq.idEquipTrans = eq1.idEquipTrans
+          JOIN MeiosTX_Web_MG.dbo.tabFrequenciasAnatel tfa 
+           ON	tfa.idFrequenciaAnatel = freq.idFrequenciaAnatel
+          JOIN MeiosTX_Web_MG.dbo.tabModelosEquipTransmissao modEq 
+           ON modEq.codModeloEquip = radios.ModeloEquip
+          JOIN MeiosTX_Web_MG.dbo.tabRadioModeloCaracteristicas trc 
+           ON trc.codModeloEquip = modEq.codModeloEquip
+          AND trc.FaixaFrequencia = tfa.FaixaFrequencia
+          AND trc.Modulacao = radios.Modulacao
+          AND trc.CapacidadeMb = radios.CapacidadeMb
+          WHERE
+                  1 = 1
+                  and radios.SiglaET = ?
+                  ORDER  by radios.SiglaET 
+                 
+      
+      #
+      # Recupera os enlaces de rádio
+      #
+      getEnlaces:
+          SELECT
+                  SIT1.UfDoSite UF_SITE_SIGLA_PONTA_A,
+                  SIT1.SiglaSite SITE_SIGLA_PONTA_A,
+                  SIT2.UfDoSite UF_SITE_SIGLA_PONTA_B,
+                  SIT2.SiglaSite SITE_SIGLA_PONTA_B,
+                  CONCAT(SIT1.UfDoSite, SIT1.SiglaSite, '.', SIT2.UfDoSite, SIT2.SiglaSite) SINOTICO,
+                  eq1.idEquipTrans ,
+                  EQ1.SiglaET PONTA_A,
+                  R1.EnderecoIP ENDERECO_IP_A,
+                  ANT1.SiglaAntena SIGLA_ANTENA_A,
+                  ANT1.Altura ALTURA_A,
+                  AMOD1.Diametro DIAMETRO_A,
+                  EQ2.SiglaET PONTA_B,
+                  R2.EnderecoIP ENDERECO_IP_B,
+                  ANT2.SiglaAntena SIGLA_ANTENA_B,
+                  ANT2.Altura ALTURA_B,
+                  R1.CapacidadeMb CAPACIDADE_MB_MIN,
+                  R1.CapacidadeMbmAX CAPACIDADE_MB_MAX,
+                  R1.SiglaET HOST_RADIO,
+                  R1.Trecho TRECHO,
+                  R1.Status STATUS,
+                  R1.Atenuacao ATENUACAO,
+                  R1.NivelTX NIVEL_TX,
+                  R1.Potencia POTENCIA,
+                  R1.Sensibilidade SENSIBILIDADE,
+                  R1.RadioGerenciado GERENCIADO,
+                  R1.Modulacao MODULACAO,
+                  R1.FaixaFrequencia FAIXA_FREQUENCIA
+                    FROM    MeiosTX_Web_MG.dbo.tabRadios R1
+          JOIN MeiosTX_Web_MG.dbo.tabAntenas ANT1
+                      ON    ANT1.idAntena = R1.idAntena
+          JOIN MeiosTX_Web_MG.dbo.tabAntenaModelos AMOD1 on
+                      AMOD1.codAntena = R1.codAntena
+          JOIN MeiosTX_Web_MG.dbo.tabSites sit1 on
+                      sit1.idSite = ANT1.idSite
+          JOIN MeiosTX_Web_MG.dbo.tabEquipamentosTransmissao EQ1
+                      ON    EQ1.idEquipTrans = R1.idEquipTrans
+          JOIN MeiosTX_Web_MG.dbo.tabEquipamentosTransmissao EQ2
+                      ON    EQ2.idEquipTrans = R1.idEquipTransAssociado
+          JOIN MeiosTX_Web_MG.dbo.tabRadios R2
+                      ON
+                  R2.idEquipTrans = EQ2.idEquipTrans
+          JOIN MeiosTX_Web_MG.dbo.tabAntenas ANT2
+                      ON    ANT2.idAntena = R2.idAntena
+          JOIN MeiosTX_Web_MG.dbo.tabAntenaModelos AMOD2 on
+                      AMOD2.codAntena = R2.codAntena
+          JOIN MeiosTX_Web_MG.dbo.tabSites sit2 on
+                      sit2.idSite = ANT2.idSite	
+                    WHERE   R1.Status = 'Ativado'    
+                  AND ANT1.SiglaAntena IS NOT NULL
+                  AND ANT2.SiglaAntena IS NOT NULL  
+
+- name: smtxDwdmImport
+  group: smtx
+  className: com.osstelecom.db.inventory.manager.client.smtx.jobs.SMTXDwdmJob
+  cron: "*/10 * * * * ?"
+  enabled: true
+  queries:
+    getDwdm:
+      SELECT
+      equipTrans.idEquipTrans IdEquipamento
+      ,equipTrans.SiglaET as Hostname
+      ,mux.Status
+      ,fabricanteEquipTrans.descricao Fabricante
+      ,modelosEquipTrans.descricao Modelo
+      ,sites.SiglaSite
+      ,sites.UFDoSite UfSite
+      ,mux.NumShelfs
+      ,CASE WHEN Mux.FuncaoEnderecoIP IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP END FuncaoEnderecoIP
+      ,CASE WHEN Mux.EnderecoIP IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP END EnderecoIP
+      ,CASE WHEN Mux.FuncaoEnderecoIP2 IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP2 END FuncaoEnderecoIP2
+      ,CASE WHEN Mux.EnderecoIP2 IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP2 END EnderecoIP2
+      ,CASE WHEN Mux.FuncaoEnderecoIP3 IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP3 END FuncaoEnderecoIP3
+      ,CASE WHEN Mux.EnderecoIP3 IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP3 END EnderecoIP3
+      ,CASE WHEN Mux.FuncaoEnderecoIP4 IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP4 END FuncaoEnderecoIP4
+      ,CASE WHEN Mux.EnderecoIP4 IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP4 END EnderecoIP4
+      ,mux.Configuracao
+      ,mux.NumOE
+      FROM	[MeiosTX_Web_BN].[dbo].[tabMUX] mux
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipTrans
+      ON mux.idEquipTrans = equipTrans.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabSites] sites
+      ON equipTrans.idSite = sites.idSite
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabModelosEquipTransmissao] modelosEquipTrans
+      ON mux.ModeloEquip = modelosEquipTrans.codModeloEquip
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabFabricantesEquipTransmissao] fabricanteEquipTrans
+      ON mux.codFabricante = fabricanteEquipTrans.codFabricante
+      WHERE	mux.Status != 'Desativado'
+      AND		(equipTrans.SiglaET NOT LIKE '%DELETAR%' AND equipTrans.SiglaET NOT LIKE '%TESTE%')
+      AND		EXISTS (
+                  SELECT	idEquipTrans
+                  FROM
+                  (
+                    SELECT	DISTINCT idEquipTransInic AS idEquipTrans
+                    FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+                    WHERE	Status != 'Desativado'
+                    UNION
+                    SELECT	DISTINCT idEquipTransFim
+                    FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+                    WHERE	Status != 'Desativado'
+                  )ots
+                  WHERE ots.idEquipTrans = mux.idEquipTrans
+            )
+
+    getDwdmShelf:
+      SELECT
+      DISTINCT
+      equipTrans.idEquipTrans as IdEquipamento
+      ,equipTrans.SiglaET as Hostname
+      ,mux.Status
+      ,muxSlot.Shelf
+      ,shelf.Status AS StatusShelf
+      ,subModeloEquip.DescSubModeloEquip as SubModeloEquipamento
+      ,shelf.TipoAddDrop
+      FROM	[MeiosTX_Web_BN].[dbo].[tabMUX] mux
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] muxSlot
+      ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabShelf] shelf
+      ON muxSlot.idShelf = shelf.idShelf
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabSubModelosEquipTransmissao] subModeloEquip
+      ON shelf.idSubModeloEquip = subModeloEquip.idSubModeloEquip
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipTrans
+      ON mux.idEquipTrans = equipTrans.idEquipTrans
+      WHERE	    mux.Status != 'Desativado'
+      AND		(equipTrans.SiglaET NOT LIKE '%DELETAR%' AND equipTrans.SiglaET NOT LIKE '%TESTE%')
+      AND		EXISTS (
+          SELECT	idEquipTrans
+          FROM
+          (
+            SELECT	DISTINCT idEquipTransInic AS idEquipTrans
+            FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+            WHERE	Status != 'Desativado'
+            UNION
+            SELECT	DISTINCT idEquipTransFim
+            FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+            WHERE	Status != 'Desativado'
+          )ots
+          WHERE ots.idEquipTrans = mux.idEquipTrans
+      )
+
+
+    getDwdmSlot:
+      SELECT
+      equipTrans.idEquipTrans AS IdEquipamento
+      ,equipTrans.SiglaET AS Hostname
+      ,muxSlot.Shelf
+      ,shelf.Status AS StatusShelf
+      ,subModeloEquip.DescSubModeloEquip as SubModeloEquipamento
+      ,muxSlot.Slot
+      ,muxSlot.Status AS StatusSlot
+      ,muxTipoPlaca.Descricao TipoPlaca
+      ,muxTipoPlaca.Funcao
+      ,muxTipoPlaca.NumPortas
+      ,muxTipoPlaca.NumPortasLogicas
+      ,muxTipoPlaca.NumDIDs
+      ,muxTipoPlaca.NumPlacas
+      ,muxSlot.numOE
+      FROM	[MeiosTX_Web_BN].[dbo].[tabMUX] mux
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipTrans
+      ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXSlots] muxSlot
+      ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabShelf] shelf
+      ON muxSlot.idShelf = shelf.idShelf
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabSubModelosEquipTransmissao] subModeloEquip
+      ON shelf.idSubModeloEquip = subModeloEquip.idSubModeloEquip
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXTipoPlacas] muxTipoPlaca
+      ON muxSlot.idMUXTipoPlaca = muxTipoPlaca.idMUXTipoPlaca
+      WHERE	mux.Status != 'Desativado'
+      AND		(equipTrans.SiglaET NOT LIKE '%DELETAR%' AND equipTrans.SiglaET NOT LIKE '%TESTE%')
+      AND		muxSlot.Slot IS NOT NULL
+      AND		muxSlot.Modulo IS NULL
+      AND		EXISTS 
+      (
+      SELECT	idEquipTrans
+          FROM
+          (
+            SELECT	DISTINCT idEquipTransInic AS idEquipTrans
+            FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+            WHERE	Status != 'Desativado'
+              UNION
+            SELECT	DISTINCT idEquipTransFim
+            FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+            WHERE	Status != 'Desativado'
+          )ots
+          WHERE ots.idEquipTrans = mux.idEquipTrans
+      )
+
+
+    getDwdmModulo:
+      SELECT
+      equipTrans.idEquipTrans AS IdEquipamento
+      ,equipTrans.SiglaET AS Hostname
+      ,muxSlot.Shelf
+      ,shelf.Status AS StatusShelf
+      ,subModeloEquip.DescSubModeloEquip as SubModeloEquipamento
+      ,muxSlot.Slot
+      ,muxSlot.Modulo
+      ,muxSlot.Status AS StatusSlot
+      ,muxTipoPlaca.Descricao TipoPlaca
+      ,muxTipoPlaca.Funcao
+      ,muxTipoPlaca.NumPortas
+      ,muxTipoPlaca.NumPortasLogicas
+      ,muxTipoPlaca.NumDIDs
+      ,muxTipoPlaca.NumPlacas
+      ,muxSlot.numOE
+      FROM	[MeiosTX_Web_BN].[dbo].[tabMUX] mux
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipTrans
+      ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXSlots] muxSlot
+      ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabShelf] shelf
+      ON muxSlot.idShelf = shelf.idShelf
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabSubModelosEquipTransmissao] subModeloEquip
+      ON shelf.idSubModeloEquip = subModeloEquip.idSubModeloEquip
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXTipoPlacas] muxTipoPlaca
+      ON muxSlot.idMUXTipoPlaca = muxTipoPlaca.idMUXTipoPlaca
+      WHERE	mux.Status != 'Desativado'
+      AND		(equipTrans.SiglaET NOT LIKE '%DELETAR%' AND equipTrans.SiglaET NOT LIKE '%TESTE%')
+      AND		muxSlot.Slot IS NOT NULL
+      AND		muxSlot.Modulo IS NOT NULL
+      AND		EXISTS
+      (
+      SELECT	idEquipTrans
+      FROM
+      (
+      SELECT	DISTINCT idEquipTransInic AS idEquipTrans
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+      WHERE	Status != 'Desativado'
+      UNION
+      SELECT	DISTINCT idEquipTransFim
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+      WHERE	Status != 'Desativado'
+      )ots
+      WHERE ots.idEquipTrans = mux.idEquipTrans
+      )
+
+
+    getDwdmPortaSemModulo:
+      SELECT
+      equipTrans.idEquipTrans as IdEquipamento
+      ,equipTrans.SiglaET AS Hostname
+      ,muxSlot.Shelf
+      ,shelf.Status AS StatusShelf
+      ,subModeloEquip.DescSubModeloEquip as SubModeloEquipamento
+      ,muxSlot.Slot
+      ,muxSlot.Modulo
+      ,muxSlotPorta.Porta
+      ,muxSlotPorta.Nome
+      ,muxSlotPorta.Funcao
+      ,muxSlotPorta.FuncaoPorta
+      ,muxSlotPorta.VelocidadePorta
+      ,muxSlotPorta.SwitchMode
+      ,muxSlotPorta.AutoNegociacao
+      ,muxSlotPorta.Eletrico
+      FROM	[MeiosTX_Web_BN].[dbo].[tabMUX] mux
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipTrans
+      ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXSlots] muxSlot
+      ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] muxSlotPorta
+      ON muxSlotPorta.idMUXSlot = muxSlot.idMUXSlot
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabShelf] shelf
+      ON muxSlot.idShelf = shelf.idShelf
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabSubModelosEquipTransmissao] subModeloEquip
+      ON shelf.idSubModeloEquip = subModeloEquip.idSubModeloEquip
+      WHERE	mux.Status != 'Desativado'
+      AND		(equipTrans.SiglaET NOT LIKE '%DELETAR%' AND equipTrans.SiglaET NOT LIKE '%TESTE%')
+      AND		muxSlot.Slot IS NOT NULL
+      AND		muxSlot.Modulo IS NULL
+      AND		muxSlotPorta.Porta IS NOT NULL
+      AND		EXISTS
+      (
+      SELECT	idEquipTrans
+      FROM
+      (
+      SELECT	DISTINCT idEquipTransInic AS idEquipTrans
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+      WHERE	Status != 'Desativado'
+      UNION
+      SELECT	DISTINCT idEquipTransFim
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+      WHERE	Status != 'Desativado'
+      )ots
+      WHERE ots.idEquipTrans = mux.idEquipTrans
+      )
+
+
+    getDwdmPortaComModulo:
+      SELECT
+      equipTrans.idEquipTrans as IdEquipamento
+      ,equipTrans.SiglaET AS Hostname
+      ,muxSlot.Shelf
+      ,shelf.Status AS StatusShelf
+      ,subModeloEquip.DescSubModeloEquip as SubModeloEquipamento
+      ,muxSlot.Slot
+      ,muxSlot.Modulo
+      ,muxSlotPorta.Porta
+      ,muxSlotPorta.Nome
+      ,muxSlotPorta.Funcao
+      ,muxSlotPorta.FuncaoPorta
+      ,muxSlotPorta.VelocidadePorta
+      ,muxSlotPorta.SwitchMode
+      ,muxSlotPorta.AutoNegociacao
+      ,muxSlotPorta.Eletrico
+      FROM	[MeiosTX_Web_BN].[dbo].[tabMUX] mux
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipTrans
+      ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXSlots] muxSlot
+      ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] muxSlotPorta
+      ON muxSlotPorta.idMUXSlot = muxSlot.idMUXSlot
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabShelf] shelf
+      ON muxSlot.idShelf = shelf.idShelf
+      LEFT JOIN  [MeiosTX_Web_BN].[dbo].[tabSubModelosEquipTransmissao] subModeloEquip
+      ON shelf.idSubModeloEquip = subModeloEquip.idSubModeloEquip
+      WHERE	mux.Status != 'Desativado'
+      AND		(equipTrans.SiglaET NOT LIKE '%DELETAR%' AND equipTrans.SiglaET NOT LIKE '%TESTE%')
+      AND		muxSlot.Slot IS NOT NULL
+      AND		muxSlot.Modulo IS NOT NULL
+      AND		muxSlotPorta.Porta IS NOT NULL
+      AND		EXISTS
+      (
+      SELECT	idEquipTrans
+      FROM
+      (
+      SELECT	DISTINCT idEquipTransInic AS idEquipTrans
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+      WHERE	Status != 'Desativado'
+      UNION
+      SELECT	DISTINCT idEquipTransFim
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader]
+      WHERE	Status != 'Desativado'
+      )ots
+      WHERE ots.idEquipTrans = mux.idEquipTrans
+      )
+
+
+    getDwdmCircuitoOts:
+      SELECT
+           ots_h.idWDMOTS IdOts
+          ,ots_h.Status	StatusOts
+          ,equipA.idEquipTrans IdEquipamentoA
+          ,equipA.SiglaET HostnameA
+          ,rxSlotA.Shelf RxShelfA
+          ,rxSlotA.Slot RxSlotA
+          ,rxSlotA.Modulo RxModuloA
+          ,rxSlotPortaA.Porta RxPortaA
+          ,txSlotA.Shelf TxShelfA
+          ,txSlotA.Slot TxSlotA
+          ,txSlotA.Modulo TxModuloA
+          ,txSlotPortaA.Porta TxPortaA
+          ,equipB.idEquipTrans IdEquipamentoB
+          ,equipB.SiglaET HostnameB
+          ,rxSlotB.Shelf RxShelfB
+          ,rxSlotB.Slot RxSlotB
+          ,rxSlotB.Modulo RxModuloB
+          ,rxSlotPortaB.Porta RxPortaB
+          ,txSlotB.Shelf TxShelfB
+          ,txSlotB.Slot TxSlotB
+          ,txSlotB.Modulo TxModuloB
+          ,txSlotPortaB.Porta TxPortaB
+          ,Fibra.TipoFibra
+          ,RedeOptica.TipoRedeOptica
+          ,ots_h.Sigla
+          ,ots_h.DistanciaTeorica
+          ,ots_h.DistanciaReal
+          ,ots_h.AtenuacaoTeorica
+          ,ots_h.AtenuacaoRealTX
+          ,ots_h.AtenuacaoRealRX
+          ,ots_h.dB_Km
+          ,ots_h.ChaveOTS
+          ,ots_h.ChaveOMS
+          ,ots_h.NumOEAtivacao
+          ,ots_h.NumOEDesativ
+          ,ots_h.idETP
+          ,ots_h.MargemSistemica
+          ,ots_h.Coerente
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader] ots_h
+      INNER JOIN
+      (
+        SELECT ROW_NUMBER() OVER (PARTITION BY A.idWDMOTS ORDER BY A.idWDMOTS, A.idWDMOMS DESC) ID
+        ,A.idWDMOTS
+        ,A.idWDMOMS
+        FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTS] A INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOMS] B ON A.idWDMOMS = B.idWDMOMS AND B.Status != 'Desativado'
+        WHERE	A.idWDMOTS IS NOT NULL
+      ) ots ON ots_h.idWDMOTS = ots.idWDMOTS AND ots.ID = 1
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+        ON ots_h.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUX] equipMuxA
+        ON equipA.idEquipTrans = equipMuxA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabSites] siteA
+        ON ots_h.idSiteInic = siteA.idSite
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] rxSlotA
+        ON ots_h.idMUXSlotInic = rxSlotA.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] rxSlotPortaA
+        ON ots_h.idMUXSlotInic = rxSlotPortaA.idMUXSlot AND ots_h.PortaInic = rxSlotPortaA.Porta
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] txSlotA
+        ON ots_h.idMUXSlotInicTX = txSlotA.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] txSlotPortaA
+        ON OTS_H.idMUXSlotInicTX = txSlotPortaA.idMUXSlot AND ots_h.PortaInicTX = txSlotPortaA.Porta
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+        ON OTS_H.idEquipTransFim = equipB.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUX] equipMuxB
+        ON equipB.idEquipTrans = equipMuxB.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabSites] siteB
+        ON ots_h.idSiteFim = siteB.idSite
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] rxSlotB
+        ON ots_h.idMUXSlotFim = rxSlotB.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] rxSlotPortaB
+        ON ots_h.idMUXSlotFim = rxSlotPortaB.idMUXSlot AND ots_h.PortaFim = rxSlotPortaB.Porta
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] txSlotB
+        ON ots_h.idMUXSlotFimTX = txSlotB.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] txSlotPortaB
+        ON ots_h.idMUXSlotFimTX = txSlotPortaB.idMUXSlot AND ots_h.PortaFimTX = txSlotPortaB.Porta
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabTipoFibra] Fibra
+        ON OTS_H.idTipoFibra = Fibra.idTipoFibra
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabTipoRedeOptica] RedeOptica
+        ON OTS_H.idTipoRedeOptica = RedeOptica.idTipoRedeOptica
+      WHERE	ots_h.Status != 'Desativado' AND (equipMuxA.Status != 'Desativado' OR equipMuxB.Status != 'Desativado')
+      AND		ots_h.idWDMOTS IN (3024,3003,4426,4427)
+
+
+    getDwdmCircuitoOms:
+      SELECT
+          oms.idWDMOMS IdOms
+          ,oms.Status StatusOms
+          ,equipA.idEquipTrans IdEquipamentoA
+          ,equipA.SiglaET HostnameA
+          ,equipB.idEquipTrans IdEquipamentoB
+          ,equipB.SiglaET HostnameB
+          ,oms.Sigla
+          ,oms.NumCanais
+          ,oms.Funcao
+          ,oms.Velocidade
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOMS] oms
+      INNER JOIN
+      (
+        SELECT  DISTINCT ots.idWDMOMS
+        FROM	  [MeiosTX_Web_BN].[dbo].[tabWDMOTS] ots
+        INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader] ots_h
+        ON ots_h.idWDMOTS = ots.idWDMOTS
+        WHERE	ots_h.Status != 'Desativado'
+      ) ots ON oms.idWDMOMS = ots.idWDMOMS
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+        ON oms.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+        ON oms.idEquipTransFim = equipB.idEquipTrans
+      WHERE	oms.Status != 'Desativado'
+      AND	oms.idWDMOMS IN (6203,4795,4794,6204)
+
+    getDwdmCircuitoOch:
+      SELECT DISTINCT
+        och.idWDMOCH IdOch
+        ,och.Status StatusOch
+        ,equipA.idEquipTrans IdEquipamentoA
+        ,equipA.SiglaET HostnameA
+        ,equipB.idEquipTrans IdEquipamentoB
+        ,equipB.SiglaET HostnameB
+        ,och.Status StatusOch
+        ,och.TipoOCH as TipoOch
+        ,och.LambdaAlien
+        ,och.Sigla
+        ,och.Funcao
+        ,och.Velocidade
+        ,ochTrechos.Canal
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOCH] och
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOCHTrechos] ochTrechos
+      ON och.idWDMOCH = ochTrechos.idWDMOCH
+      INNER JOIN
+      (
+      SELECT  DISTINCT ots.idWDMOMS
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTS] ots
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader] ots_h
+      ON ots_h.idWDMOTS = ots.idWDMOTS AND ots_h.Status != 'Desativado'
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOMS] oms
+      ON ots.idWDMOMS = oms.idWDMOMS AND  oms.Status != 'Desativado'
+      ) oms	ON oms.idWDMOMS = ochTrechos.idWDMOMS
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+      ON och.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+      ON och.idEquipTransFim = equipB.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipATrecho
+      ON ochTrechos.idEquipTransA = equipATrecho.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipBTrecho
+      ON ochTrechos.idEquipTransB = equipBTrecho.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] SlotA
+      ON och.idMUXSlotInic = SlotA.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] SlotPortaA
+      ON och.idMUXSlotInic = SlotPortaA.idMUXSlot AND och.PortaInic = SlotPortaA.Porta
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] SlotB
+      ON och.idMUXSlotFim = SlotB.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] SlotPortaB
+      ON och.idMUXSlotFim = SlotPortaB.idMUXSlot AND och.PortaFim = SlotPortaB.Porta
+      WHERE	och.Status != 'Desativado'
+      AND	och.idWDMOCH IN (14005)
+
+    getDwdmCircuitoOdu:
+      SELECT	DISTINCT
+            odu.idWDMODU AS IdOdu
+            ,oduTrechos.Caminho
+            ,odu.Status StatusOdu
+            ,odu.Sigla
+            ,equipA.SiglaET AS HostnameA
+            ,equipA.idEquipTrans IdEquipamentoA
+            ,equipB.SiglaET AS HostnameB
+            ,equipB.idEquipTrans IdEquipamentoB
+            ,odu.Velocidade
+            ,odu.CaminhoAlternativo
+            ,odu.NumOE
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMODU] odu
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMODUTrechos] oduTrechos
+        ON odu.idWDMODU = oduTrechos.idWDMODU
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+        ON ODU.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUX] equipMuxA
+        ON equipA.idEquipTrans = equipMuxA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+        ON ODU.idEquipTransFim = equipB.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUX] equipMuxB
+        ON equipB.idEquipTrans = equipMuxB.idEquipTrans
+      WHERE	odu.Status != 'Desativado'
+      AND		odu.idWDMODU = 25556
+
+
+    getDwdmCamadaOmsOts:
+      SELECT
+      oms.idWDMOMS IdOms
+      ,ots.idWDMOTS IdOts
+      ,oms.Status StatusOms
+      ,equipA.SiglaET HostnameA
+      ,equipB.SiglaET HostnameB
+      ,ots.HostnameTrechoA
+      ,ots.HostnameTrechoB
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOMS] oms
+      INNER JOIN
+      (
+      SELECT	DISTINCT
+      ots.idWDMOMS
+      ,ots.idWDMOTS
+      ,equipA.SiglaET HostnameTrechoA
+      ,equipB.SiglaET HostnameTrechoB
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOTS] ots
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader] ots_h
+      ON ots_h.idWDMOTS = ots.idWDMOTS
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+      ON ots_h.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+      ON ots_h.idEquipTransFim = equipB.idEquipTrans
+      WHERE	ots_h.Status != 'Desativado'
+      
+      ) ots ON oms.idWDMOMS = ots.idWDMOMS
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+      ON oms.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+      ON oms.idEquipTransFim = equipB.idEquipTrans
+      WHERE	oms.Status != 'Desativado'
+      AND	oms.idWDMOMS = ?
+
+    getDwdmCamadaOchOms:
+      SELECT
+      ochTrechos.Ordem OrdemA
+      ,ROW_NUMBER() OVER( PARTITION BY och.idWDMOCH ORDER BY och.idWDMOCH, ochTrechos.ORDEM DESC ) OrdemB
+      ,och.idWDMOCH IdOch
+      ,oms.idWDMOMS IdOms
+      ,och.Status StatusOch
+      ,equipA.SiglaET HostnameA
+      ,SlotA.Shelf ShelfA
+      ,SlotA.Slot SlotA
+      ,SlotA.Modulo ModuloA
+      ,SlotPortaA.Porta PortaA
+      ,equipB.SiglaET HostnameB
+      ,SlotB.Shelf ShelfB
+      ,SlotB.Slot SlotB
+      ,SlotB.Modulo ModuloB
+      ,SlotPortaB.Porta PortaB
+      ,equipATrecho.SiglaET HostnameTrechoA
+      ,equipBTrecho.SiglaET HostnameTrechoB
+      ,equipATrechoOms.SiglaET HostnameTrechoOmsA
+      ,equipBTrechoOms.SiglaET HostnameTrechoOmsB 
+      ,och.Sigla
+      ,och.Funcao
+      ,och.Velocidade
+      ,ochTrechos.Canal
+      ,LAG ( equipATrecho.SiglaET  )  OVER ( PARTITION By och.idWDMOCH ORDER BY och.idWDMOCH, ochTrechos.ORDEM DESC ) EnlaceOms
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMOCH] och
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOCHTrechos] ochTrechos
+      ON och.idWDMOCH = ochTrechos.idWDMOCH
+      INNER JOIN
+      (
+          SELECT  DISTINCT ots.idWDMOMS,oms.idEquipTransInic,oms.idEquipTransFim
+          FROM	  [MeiosTX_Web_BN].[dbo].[tabWDMOTS] ots
+          INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOTSHeader] ots_h
+          ON ots_h.idWDMOTS = ots.idWDMOTS AND ots_h.Status != 'Desativado'
+          INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMOMS] oms
+          ON ots.idWDMOMS = oms.idWDMOMS AND  oms.Status != 'Desativado'
+      ) oms	ON oms.idWDMOMS = ochTrechos.idWDMOMS
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+          ON och.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+          ON och.idEquipTransFim = equipB.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipATrecho
+          ON ochTrechos.idEquipTransA = equipATrecho.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipBTrecho
+          ON ochTrechos.idEquipTransB = equipBTrecho.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipATrechoOms
+          ON oms.idEquipTransInic = equipATrechoOms.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipBTrechoOms
+          ON oms.idEquipTransFim = equipBTrechoOms.idEquipTrans      
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] SlotA
+          ON och.idMUXSlotInic = SlotA.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] SlotPortaA
+          ON och.idMUXSlotInic = SlotPortaA.idMUXSlot AND och.PortaInic = SlotPortaA.Porta
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlots] SlotB
+          ON och.idMUXSlotFim = SlotB.idMUXSlot
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUXSlotPortas] SlotPortaB
+          ON och.idMUXSlotFim = SlotPortaB.idMUXSlot AND och.PortaFim = SlotPortaB.Porta
+      WHERE	och.Status != 'Desativado'
+      AND	OCH.idWDMOCH = ?
+      ORDER BY ochTrechos.idWDMOCH, ochTrechos.Ordem;
+
+    getDwdmCamadaOduOch:
+      SELECT
+         odu.idWDMODU AS IdOdu
+        ,oduTrechos.idWDMOCH AS IdOch
+        ,oduTrechos.Caminho
+        ,odu.Status StatusOdu
+        ,odu.Sigla
+        ,equipA.SiglaET AS HostnameA
+        ,equipA.idEquipTrans IdEquipamentoA
+        ,equipB.SiglaET AS HostnameB
+        ,equipB.idEquipTrans IdEquipamentoB
+      FROM	[MeiosTX_Web_BN].[dbo].[tabWDMODU] odu
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabWDMODUTrechos] oduTrechos
+      ON odu.idWDMODU = oduTrechos.idWDMODU
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipA
+      ON ODU.idEquipTransInic = equipA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUX] equipMuxA
+      ON equipA.idEquipTrans = equipMuxA.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabEquipamentosTransmissao] equipB
+      ON ODU.idEquipTransFim = equipB.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BN].[dbo].[tabMUX] equipMuxB
+      ON equipB.idEquipTrans = equipMuxB.idEquipTrans
+      WHERE	odu.Status != 'Desativado'
+      AND		odu.idWDMODU = ?
+      AND		oduTrechos.Caminho = ?
+      ORDER BY oduTrechos.Caminho, oduTrechos.Ordem
+
+
+
+
+- name: smtxMetroImport
+  group: smtx
+  className: com.osstelecom.db.inventory.manager.client.smtx.jobs.SMTXMetroJob
+  cron: "*/10 * * * * ?"
+  enabled: false
+  queries:
+    getMetro: SELECT
+      equipTrans.idEquipTrans IdEquipamento
+      ,equipTrans.SiglaET as Hostname
+      ,CASE
+      WHEN equipTrans.SiglaET LIKE '%-HL5%' THEN 'HL5'
+      WHEN equipTrans.SiglaET LIKE '%-HL4%' THEN 'HL4'
+      WHEN equipTrans.SiglaET LIKE '%-GWD%' THEN 'GWD'
+      WHEN equipTrans.SiglaET LIKE '%-GWC%' THEN 'GWC'
+      ELSE NULL
+      END Camada
+      ,mux.Status
+      ,fabricanteEquipTrans.descricao Fabricante
+      ,modelosEquipTrans.descricao Modelo
+      ,sites.SiglaSite
+      ,sites.UFDoSite UfSite
+      ,mux.NumShelfs
+      ,CASE WHEN Mux.FuncaoEnderecoIP IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP END FuncaoEnderecoIP
+      ,CASE WHEN Mux.EnderecoIP IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP END EnderecoIP
+      ,CASE WHEN Mux.FuncaoEnderecoIP2 IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP2 END FuncaoEnderecoIP2
+      ,CASE WHEN Mux.EnderecoIP2 IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP2 END EnderecoIP2
+      ,CASE WHEN Mux.FuncaoEnderecoIP3 IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP3 END FuncaoEnderecoIP3
+      ,CASE WHEN Mux.EnderecoIP3 IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP3 END EnderecoIP3
+      ,CASE WHEN Mux.FuncaoEnderecoIP4 IN ('Selecione','') THEN NULL ELSE Mux.FuncaoEnderecoIP4 END FuncaoEnderecoIP4
+      ,CASE WHEN Mux.EnderecoIP4 IN ('Selecione','') THEN NULL ELSE Mux.EnderecoIP4 END EnderecoIP4
+      ,mux.Configuracao
+      ,mux.NumOE
+      FROM	[MeiosTX_Web_BA].[dbo].[tabMUX] mux
+      INNER JOIN [MeiosTX_Web_BA].[dbo].[tabEquipamentosTransmissao] equipTrans ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN  [MeiosTX_Web_BA].[dbo].[tabModelosEquipTransmissao] modelosEquipTrans on mux.ModeloEquip = modelosEquipTrans.codModeloEquip
+      LEFT JOIN  [MeiosTX_Web_BA].[dbo].[tabFabricantesEquipTransmissao] fabricanteEquipTrans on mux.codFabricante = fabricanteEquipTrans.codFabricante
+      LEFT JOIN  [MeiosTX_Web_BA].[dbo].[tabSites] sites on equipTrans.idsite = sites.idsite
+      WHERE	    (equipTrans.SiglaET LIKE '%hl5%')
+      AND		mux.Status != 'Desativado'
+
+    getMetroShelf: SELECT
+      DISTINCT
+      equipTrans.SiglaET as Hostname
+      ,CASE
+      WHEN equipTrans.SiglaET LIKE '%-HL5%' THEN 'HL5'
+      WHEN equipTrans.SiglaET LIKE '%-HL4%' THEN 'HL4'
+      WHEN equipTrans.SiglaET LIKE '%-GWD%' THEN 'GWD'
+      WHEN equipTrans.SiglaET LIKE '%-GWC%' THEN 'GWC'
+      ELSE NULL
+      END Camada
+      ,mux.Status
+      ,muxSlot.Shelf
+      FROM	[MeiosTX_Web_BA].[dbo].[tabMUX] mux
+      INNER JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlots] muxSlot ON mux.idEquipTrans = muxSlot.idEquipTrans
+      INNER JOIN [MeiosTX_Web_BA].[dbo].[tabEquipamentosTransmissao] equipTrans ON mux.idEquipTrans = equipTrans.idEquipTrans
+      WHERE	    (equipTrans.SiglaET LIKE '%hl5%')
+      AND		mux.Status != 'Desativado'
+
+    getMetroSlot: SELECT
+      equipTrans.SiglaET as Hostname
+      ,CASE
+      WHEN equipTrans.SiglaET LIKE '%-HL5%' THEN 'HL5'
+      WHEN equipTrans.SiglaET LIKE '%-HL4%' THEN 'HL4'
+      WHEN equipTrans.SiglaET LIKE '%-GWD%' THEN 'GWD'
+      WHEN equipTrans.SiglaET LIKE '%-GWC%' THEN 'GWC'
+      ELSE NULL
+      END Camada
+      ,mux.Status
+      ,muxSlot.Shelf
+      ,muxSlot.Slot
+      ,muxTipoPlaca.Descricao TipoPlaca
+      ,muxTipoPlaca.Funcao
+      ,muxTipoPlaca.NumPortas
+      ,muxTipoPlaca.NumPortasLogicas
+      ,muxTipoPlaca.NumDIDs
+      ,muxTipoPlaca.NumPlacas
+      FROM	[MeiosTX_Web_BA].[dbo].[tabMUX] mux
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlots] muxSlot ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabEquipamentosTransmissao] equipTrans ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXTipoPlacas] muxTipoPlaca ON muxSlot.idMUXTipoPlaca = muxTipoPlaca.idMUXTipoPlaca
+      WHERE	    (equipTrans.SiglaET LIKE '%hl5%')
+      AND		muxSlot.Slot IS NOT NULL
+      AND		muxSlot.Modulo IS NULL
+      AND	    mux.Status != 'Desativado'
+
+    getMetroModulo: SELECT
+      equipTrans.SiglaET as Hostname
+      ,CASE
+      WHEN equipTrans.SiglaET LIKE '%-HL5%' THEN 'HL5'
+      WHEN equipTrans.SiglaET LIKE '%-HL4%' THEN 'HL4'
+      WHEN equipTrans.SiglaET LIKE '%-GWD%' THEN 'GWD'
+      WHEN equipTrans.SiglaET LIKE '%-GWC%' THEN 'GWC'
+      ELSE NULL
+      END Camada
+      ,mux.Status
+      ,muxSlot.Shelf
+      ,muxSlot.Slot
+      ,muxSlot.Modulo
+      ,muxTipoPlaca.Descricao TipoPlaca
+      ,muxTipoPlaca.Funcao
+      ,muxTipoPlaca.NumPortas
+      ,muxTipoPlaca.NumPortasLogicas
+      ,muxTipoPlaca.NumDIDs
+      ,muxTipoPlaca.NumPlacas
+      FROM	[MeiosTX_Web_BA].[dbo].[tabMUX] mux
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlots] muxSlot ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabEquipamentosTransmissao] equipTrans ON mux.idEquipTrans = equipTrans.idEquipTrans
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXTipoPlacas] muxTipoPlaca ON muxSlot.idMUXTipoPlaca = muxTipoPlaca.idMUXTipoPlaca
+      WHERE	    (equipTrans.SiglaET LIKE '%hl5%')
+      AND		muxSlot.Slot IS NOT NULL
+      AND		muxSlot.Modulo IS NOT NULL
+      AND	    mux.Status != 'Desativado'
+
+    getMetroPortaSemModulo:
+      SELECT
+      equipTrans.SiglaET as Hostname
+      ,CASE
+      WHEN equipTrans.SiglaET LIKE '%-HL5%' THEN 'HL5'
+      WHEN equipTrans.SiglaET LIKE '%-HL4%' THEN 'HL4'
+      WHEN equipTrans.SiglaET LIKE '%-GWD%' THEN 'GWD'
+      WHEN equipTrans.SiglaET LIKE '%-GWC%' THEN 'GWC'
+      ELSE NULL
+      END Camada
+      ,mux.Status
+      ,muxSlot.Shelf
+      ,muxSlot.Slot
+      ,muxSlotPorta.Porta
+      ,muxSlotPorta.Nome
+      ,muxSlotPorta.Funcao
+      ,muxSlotPorta.FuncaoPorta
+      ,muxSlotPorta.VelocidadePorta
+      ,muxSlotPorta.SwitchMode
+      ,muxSlotPorta.AutoNegociacao
+      ,muxSlotPorta.Eletrico
+      FROM	[MeiosTX_Web_BA].[dbo].[tabMUX] mux
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlots] muxSlot ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlotPortas] muxSlotPorta ON muxSlot.idMUXSlot = muxSlotPorta.idMUXSlot
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabEquipamentosTransmissao] equipTrans ON mux.idEquipTrans = equipTrans.idEquipTrans
+      WHERE	    (equipTrans.SiglaET LIKE '%hl5%')
+      AND		muxSlotPorta.Porta IS NOT NULL
+      AND		muxSlot.Modulo IS NULL
+      AND		mux.Status != 'Desativado'
+
+    getMetroPortaComModulo:
+      SELECT
+      equipTrans.SiglaET as Hostname
+      ,CASE
+      WHEN equipTrans.SiglaET LIKE '%-HL5%' THEN 'HL5'
+      WHEN equipTrans.SiglaET LIKE '%-HL4%' THEN 'HL4'
+      WHEN equipTrans.SiglaET LIKE '%-GWD%' THEN 'GWD'
+      WHEN equipTrans.SiglaET LIKE '%-GWC%' THEN 'GWC'
+      ELSE NULL
+      END Camada
+      ,mux.Status
+      ,muxSlot.Shelf
+      ,muxSlot.Slot
+      ,muxSlot.Modulo
+      ,muxSlotPorta.Porta
+      ,muxSlotPorta.Nome
+      ,muxSlotPorta.Funcao
+      ,muxSlotPorta.FuncaoPorta
+      ,muxSlotPorta.VelocidadePorta
+      ,muxSlotPorta.SwitchMode
+      ,muxSlotPorta.AutoNegociacao
+      ,muxSlotPorta.Eletrico
+      FROM	[MeiosTX_Web_BA].[dbo].[tabMUX] mux
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlots] muxSlot ON mux.idEquipTrans = muxSlot.idEquipTrans
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabMUXSlotPortas] muxSlotPorta ON muxSlot.idMUXSlot = muxSlotPorta.idMUXSlot
+      LEFT JOIN [MeiosTX_Web_BA].[dbo].[tabEquipamentosTransmissao] equipTrans ON mux.idEquipTrans = equipTrans.idEquipTrans
+      WHERE	    (equipTrans.SiglaET LIKE '%hl5%')
+      AND		muxSlotPorta.Porta IS NOT NULL
+      AND		muxSlot.Modulo IS NOT NULL
+      AND		mux.Status != 'Desativado'
